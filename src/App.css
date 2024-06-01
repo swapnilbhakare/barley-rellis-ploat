@@ -1,0 +1,16 @@
+.container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap; /* Allow items to wrap onto the next line if necessary */
+}
+
+.legendContainer {
+    margin-left: 20px; /* Adjust the margin between the dropdowns and the legend if needed */
+}
+
+.dropdonws{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}

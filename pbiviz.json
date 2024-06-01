@@ -1,0 +1,25 @@
+{
+    "visual": {
+        "name": "trellisPlot",
+        "displayName": "trellisPlot",
+        "guid": "trellisPlot4B08D4EBA0FB4FF3A8F60412F4EE027A",
+        "visualClassName": "Visual",
+        "version": "1.0.0",
+        "description": "swap",
+        "supportUrl": "swap",
+        "gitHubUrl": "swap"
+    },
+    "apiVersion": "5.1.0",
+    "author": {
+        "name": "swap",
+        "email": "swap"
+    },
+    "assets": {
+        "icon": "assets/icon.png"
+    },
+    "externalJS": null,
+    "style": "style/visual.less",
+    "capabilities": "capabilities.json",
+    "dependencies": null,
+    "stringResources": []
+}

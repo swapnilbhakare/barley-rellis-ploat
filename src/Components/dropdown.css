@@ -1,0 +1,14 @@
+/* dropdown.css */
+select {
+    padding: 4px 8px ;
+    font-size: 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    
+}
+
+label {
+    margin-left: 8px;
+    margin-right: 4px;
+    font-weight: normal;
+}
