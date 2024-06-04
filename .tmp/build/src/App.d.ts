@@ -9,8 +9,6 @@ interface AppProps {
     host: any;
     dataView: DataView;
     formattingSettings: VisualFormattingSettingsModel;
-    accessToken: string;
-    reportId: string;
 }
 declare const App: React.FC<AppProps>;
 export default App;

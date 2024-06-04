@@ -4,14 +4,15 @@ import { ITooltipServiceWrapper, createTooltipServiceWrapper, TooltipEventArgs }
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
 import ISelectionId = powerbi.visuals.ISelectionId;
 
-
 interface DataItem {
     yield: number;
     variety: string;
     year: number;
     site: string;
+    probability: number;
     selectionId: ISelectionId;
 }
+
 const TrellisChart = ({ data, options, target, host }: { data: DataItem[], options: any, target: any, host: any }) => {
     const margin = { top: 40, right: 40, bottom: 40, left: 40 };
 
@@ -23,7 +24,6 @@ const TrellisChart = ({ data, options, target, host }: { data: DataItem[], optio
     const tooltipServiceWrapperRef = useRef<ITooltipServiceWrapper | null>(null);
     const selectionManagerRef = useRef<ISelectionManager | null>(null);
     const [selectedCircle, setSelectedCircle] = useState<DataItem | null>(null);
-
 
     useEffect(() => {
         if (!data || !data.length) return;
@@ -46,42 +46,85 @@ const TrellisChart = ({ data, options, target, host }: { data: DataItem[], optio
         setWidth(newWidth);
         setHeight(newHeight);
     };
-    // useEffect(() => {
-    //     if (!data || !data.length) return;
 
-    //     renderChart();
-    //     selectionManagerRef.current = host.createSelectionManager();
-    // }, [data, width, height, selectedIds]);
+    const calculateStatistics = (data: DataItem[]): { median: number, q1: number, q3: number, probability: number } => {
+        const values = data.map(d => d.yield).sort(d3.ascending);
+        const totalProbability = d3.sum(data.map(d => d.probability));
+        return {
+            median: d3.median(values),
+            q1: d3.quantile(values, 0.25),
+            q3: d3.quantile(values, 0.75),
+            probability: totalProbability / data.length
+        };
+    };
+    
+    const computeStatisticsRecursive = (data: DataItem[], siteIndex: number, varietyIndex: number, sites: string[], varieties: string[], stats: Map<string, Map<string, { median: number, q1: number, q3: number, probability: number }>>): void => {
+        if (siteIndex >= sites.length) return;
+        if (varietyIndex >= varieties.length) {
+            computeStatisticsRecursive(data, siteIndex + 1, 0, sites, varieties, stats);
+            return;
+        }
+
+        const site = sites[siteIndex];
+        const variety = varieties[varietyIndex];
+        const filteredData = data.filter(d => d.site === site && d.variety === variety);
+
+        if (!stats.has(site)) {
+            stats.set(site, new Map());
+        }
+
+        stats.get(site)!.set(variety, calculateStatistics(filteredData));
+
+        computeStatisticsRecursive(data, siteIndex, varietyIndex + 1, sites, varieties, stats);
+    };
+
     const renderChart = () => {
         const svg = d3.select(svgRef.current);
-    
+
         const numericData = data.filter(d => typeof d.yield === 'number');
-    
+
+        const sites = Array.from(new Set(data.map(d => d.site)));
+        const varieties = Array.from(new Set(data.map(d => d.variety)));
+
+        const stats = new Map<string, Map<string, { median: number, q1: number, q3: number, probability: number }>>();
+        computeStatisticsRecursive(numericData, 0, 0, sites, varieties, stats);
+
+        const sortedSites = sites.sort((a, b) => {
+            const medianA = d3.median(Array.from(stats.get(a)!.values()).map(d => d.median));
+            const medianB = d3.median(Array.from(stats.get(b)!.values()).map(d => d.median));
+            return d3.descending(medianA, medianB);
+        });
+
+        const sortedVarieties = varieties.sort((a, b) => {
+            const mediansA = Array.from(stats.values()).map(map => map.get(a)?.median).filter(median => median !== undefined);
+            const mediansB = Array.from(stats.values()).map(map => map.get(b)?.median).filter(median => median !== undefined);
+            const medianA = d3.median(mediansA);
+            const medianB = d3.median(mediansB);
+            return d3.descending(medianA, medianB);
+        });
+
         const x = d3.scaleLinear()
             .domain([0, d3.max(numericData, d => Number(d.yield))!])
             .range([margin.left, width - margin.right]);
-    
-        const sites = Array.from(new Set(data.map(d => d.site)));
-        const varieties = Array.from(new Set(data.map(d => d.variety)));
+
         const ySite = d3.scaleBand()
-            .domain(sites)
+            .domain(sortedSites)
             .range([height, 0])
             .padding(0.1);
-    
+
         const yVariety = d3.scaleBand()
-            .domain(varieties)
+            .domain(sortedVarieties)
             .range([0, ySite.bandwidth()])
             .padding(0.1);
-    
+
         const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
-    
+
         svg.selectAll("*").remove();
-    
+
         if (!tooltipServiceWrapperRef.current) {
             tooltipServiceWrapperRef.current = createTooltipServiceWrapper(host.tooltipService, svgRef.current);
         }
-    
-        // Add background rectangle for detecting clicks on empty space
+
         svg.append("rect")
             .attr("width", width)
             .attr("height", height)
@@ -90,15 +133,15 @@ const TrellisChart = ({ data, options, target, host }: { data: DataItem[], optio
             .on("click", () => {
                 handleBackgroundClick();
             });
-    
+
         svg.selectAll(".site-rect")
-            .data(sites)
+            .data(sortedSites)
             .enter()
             .append("rect")
             .attr("class", "site-rect")
             .attr("x", margin.left)
             .attr("y", d => ySite(d)!)
-            .attr("width", width - margin.left - margin.right) // Adjusted width to include margin on both sides
+            .attr("width", width - margin.left - margin.right)
             .attr("height", ySite.bandwidth())
             .attr("fill", "#fff")
             .attr("stroke", "gray")
@@ -106,29 +149,29 @@ const TrellisChart = ({ data, options, target, host }: { data: DataItem[], optio
             .on("click", () => {
                 handleBackgroundClick();
             });
-    
+
         svg.append("g")
             .attr("class", "x axis")
             .attr("transform", `translate(0,${height - 8})`)
             .call(d3.axisBottom(x).ticks(d3.max(data, d => d.yield)! / 10));
-    
+
         svg.append("g")
             .attr("class", "y axis site")
             .attr("transform", `translate(${margin.left},0)`)
             .call(d3.axisLeft(ySite));
-    
-        sites.forEach(site => {
+
+        sortedSites.forEach(site => {
             const yVarietyForSite = d3.scaleBand()
-                .domain(varieties)
+                .domain(sortedVarieties)
                 .range([0, ySite.bandwidth()])
                 .padding(0.1);
-    
+
             svg.append("g")
                 .attr("class", "y axis variety")
                 .attr("transform", `translate(${width - margin.left},${ySite(site)})`)
                 .call(d3.axisRight(yVarietyForSite));
         });
-    
+
         const circleColor = (d: DataItem) => {
             if (d.year !== undefined && d.year !== null) {
                 const color = colorScale(d.year.toString());
@@ -139,11 +182,11 @@ const TrellisChart = ({ data, options, target, host }: { data: DataItem[], optio
             }
             return "#ccc";
         };
-    
+
         const circleStrokeWidth = (d: DataItem) => {
             return selectedCircle && selectedCircle.selectionId === d.selectionId ? 3 : 2;
         };
-    
+
         const circle = svg.selectAll(".circle")
             .data(data)
             .enter()
@@ -160,24 +203,33 @@ const TrellisChart = ({ data, options, target, host }: { data: DataItem[], optio
             })
             .on('mouseover', function(event, d) {
                 const targetElement = event.target as SVGRectElement;
-                
+
+                const siteStats = stats.get(d.site);
+                const varietyStats = siteStats ? siteStats.get(d.variety) : null;
+
                 if (tooltipServiceWrapperRef.current) {
                     tooltipServiceWrapperRef.current.addTooltip(
                         d3.select(targetElement),
                         (tooltipEvent: TooltipEventArgs<DataItem>) => {
-                            return [
+                            const tooltipData = [
                                 { displayName: 'Yield', value: d.yield.toString() },
                                 { displayName: 'Variety', value: d.variety },
                                 { displayName: 'Year', value: d.year.toString() },
                                 { displayName: 'Site', value: d.site }
                             ];
+                            if (varietyStats) {
+                                tooltipData.push(
+                                    { displayName: 'Median', value: varietyStats.median.toString() },
+                                    { displayName: 'Probability', value: (varietyStats.probability * 100).toFixed(1) + '%' }
+                                );
+                            }
+                            return tooltipData;
                         },
                         (tooltipEvent: TooltipEventArgs<DataItem>) => d.selectionId
                     );
                 }
             });
     };
-    
 
     const handleDataPointClick = async (event: any, data: DataItem) => {
         if (selectionManagerRef.current) {

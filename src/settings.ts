@@ -55,10 +55,14 @@ class TrellisChartSettings extends FormattingSettingsCard {
         displayName: "Show Year",
         value: true
     });
-
+    showProbability = new formattingSettings.ToggleSwitch({
+        name: "showProbability",
+        displayName: "Show Probability",
+        value: true
+    });
     name: string = "trellisChartSettings";
     displayName: string = "Trellis Chart DropDownSetting";
-    slices: Array<FormattingSettingsSlice> = [this.showYAxis, this.showFYAxis, this.showXAxis, this.showYear];
+    slices: Array<FormattingSettingsSlice> = [this.showYAxis, this.showFYAxis, this.showXAxis, this.showYear, this.showProbability];
 
 }
 

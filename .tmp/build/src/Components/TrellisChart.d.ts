@@ -5,6 +5,7 @@ interface DataItem {
     variety: string;
     year: number;
     site: string;
+    probability: number;
     selectionId: ISelectionId;
 }
 declare const TrellisChart: ({ data, options, target, host }: {

@@ -9,11 +9,15 @@ import "./App.css"
 import { VisualFormattingSettingsModel } from "./settings";
 import LicenseKeyValidator  from './Components/LicenseKeyValidator'
 import RenderLegend from './Components/RenderLegend'
+import * as pbi from 'powerbi-client';
+
 interface DataPoint {
     yield: number;
     variety: string;
     year: number;
     site: string;
+    probability: number;
+
     selectionId: ISelectionId;
 }
 
@@ -23,8 +27,7 @@ interface AppProps {
     host: any;
     dataView: DataView;
     formattingSettings:VisualFormattingSettingsModel;
-    accessToken: string;
-    reportId: string;
+   
 }
 // Add these lines to define the necessary properties and methods
 interface IVisualHostExtended extends powerbi.extensibility.visual.IVisualHost {
@@ -32,7 +35,10 @@ interface IVisualHostExtended extends powerbi.extensibility.visual.IVisualHost {
     getReportId(): Promise<string>;
 }
 
-const App: React.FC<AppProps> = ({ options, target, host, dataView,formattingSettings, accessToken, reportId }) => {
+const App: React.FC<AppProps> = ({ options, target, host, dataView,formattingSettings }) => {
+  
+  
+  
     const [data, setData] = useState<DataPoint[]>([]);
     const {  trellisChartSettings ,licenseKey} = formattingSettings;
    
@@ -40,6 +46,8 @@ const App: React.FC<AppProps> = ({ options, target, host, dataView,formattingSet
     const [varietyMap, setVarietyMap] = useState<{ [key: string]: any[] }>({});
     const [yearMap, setYearMap] = useState<{ [key: string]: any[] }>({});
     const [yieldMap, setYieldMap] = useState<{ [key: string]: any[] }>({});
+    const [probabilityMap, setProbabilityMap] = useState<{ [key: string]: any[] }>({});
+    const [selectedProbabilityKey, setSelectedProbabilityKey] = useState<string>('');
 
     const [selectedSiteKey, setSelectedSiteKey] = useState<string>('');
     const [selectedVarietyKey, setSelectedVarietyKey] = useState<string>('');
@@ -54,6 +62,7 @@ const App: React.FC<AppProps> = ({ options, target, host, dataView,formattingSet
         const varietyMapTemp: { [key: string]: any[] } = {};
         const yearMapTemp: { [key: string]: any[] } = {};
         const yieldMapTemp: { [key: string]: any[] } = {};
+        const probabilityMapTemp: { [key: string]: any[] } = {};
     
         categories.forEach((category: any) => {
             if (category.source.roles.site) {
@@ -71,17 +80,22 @@ const App: React.FC<AppProps> = ({ options, target, host, dataView,formattingSet
             if (value.source.roles.yield) {
                 yieldMapTemp[value.source.displayName] = value.values;
             }
+            if (value.source.roles.probability) {
+                probabilityMapTemp[value.source.displayName] = value.values;
+            }
         });
     
         setSiteMap(siteMapTemp);
         setVarietyMap(varietyMapTemp);
         setYearMap(yearMapTemp);
         setYieldMap(yieldMapTemp);
+        setProbabilityMap(probabilityMapTemp);
     
         const selectedSiteValues = selectedSiteKey ? siteMapTemp[selectedSiteKey] || [] : siteMapTemp[Object.keys(siteMapTemp)[0]] || [];
         const selectedVarietyValues = selectedVarietyKey ? varietyMapTemp[selectedVarietyKey] || [] : varietyMapTemp[Object.keys(varietyMapTemp)[0]] || [];
         const selectedYearValues = selectedYearKey ? yearMapTemp[selectedYearKey] || [] : yearMapTemp[Object.keys(yearMapTemp)[0]] || [];
         const selectedYieldValues = selectedYieldKey ? yieldMapTemp[selectedYieldKey] || [] : yieldMapTemp[Object.keys(yieldMapTemp)[0]] || [];
+        const selectedProbabilityValues = selectedProbabilityKey ? probabilityMapTemp[selectedProbabilityKey] || [] : probabilityMapTemp[Object.keys(probabilityMapTemp)[0]] || [];
     
         const categoryLength = selectedSiteValues.length;
         for (let i = 0; i < categoryLength; i++) {
@@ -90,6 +104,7 @@ const App: React.FC<AppProps> = ({ options, target, host, dataView,formattingSet
                 variety: selectedVarietyValues[i],
                 year: selectedYearValues[i],
                 site: selectedSiteValues[i],
+                probability: selectedProbabilityValues[i], // Use selectedProbabilityValues here
                 selectionId: host.createSelectionIdBuilder()
                     .withCategory(dataView.categorical.categories[0], i)
                     .createSelectionId()
@@ -98,13 +113,14 @@ const App: React.FC<AppProps> = ({ options, target, host, dataView,formattingSet
         return transformedData;
     };
     
-
+    
     useEffect(() => {
         if (dataView) {
             const siteKeys = Object.keys(siteMap);
             const varietyKeys = Object.keys(varietyMap);
             const yearKeys = Object.keys(yearMap);
             const yieldKeys = Object.keys(yieldMap);
+            const probabilityKeys = Object.keys(probabilityMap); // Add probability keys
 
             if (selectedSiteKey === '' && siteKeys.length > 0) {
                 setSelectedSiteKey(siteKeys[0]);
@@ -118,20 +134,25 @@ const App: React.FC<AppProps> = ({ options, target, host, dataView,formattingSet
             if (selectedYieldKey === '' && yieldKeys.length > 0) {
                 setSelectedYieldKey(yieldKeys[0]);
             }
+            if (selectedProbabilityKey === '' && probabilityKeys.length > 0) {
+                setSelectedProbabilityKey(probabilityKeys[0]);
+            }
+            
 
             const transformedData: DataPoint[] = transformData(dataView);
             setData(transformedData);
         }
-    }, [dataView, selectedSiteKey, selectedVarietyKey, selectedYearKey, selectedYieldKey]);
+    }, [dataView, selectedSiteKey, selectedVarietyKey, selectedYearKey, selectedYieldKey,selectedProbabilityKey]);
 
     const handleDropdownChange = (setter: React.Dispatch<React.SetStateAction<string>>) => (event: React.ChangeEvent<HTMLSelectElement>) => {
         setter(event.target.value);
     };
+    
   
 
-
+    
     return (
-        <div>
+        <div style={{overflowY:"auto"}}>
        
        <div className='container'>
     <div className='dropdonws'>
@@ -169,7 +190,16 @@ const App: React.FC<AppProps> = ({ options, target, host, dataView,formattingSet
             onChange={setSelectedYieldKey}
         />
     )}
-   
+
+   {trellisChartSettings.showProbability.value && (
+   <Dropdown
+        label="Probability"
+        options={Object.keys(probabilityMap).map(key => ({ key, value: key, text: key }))}
+        selectedValue={selectedProbabilityKey}
+        onChange={setSelectedProbabilityKey}
+    />
+ )} 
+
 
         </div>       
             <RenderLegend data={data} />

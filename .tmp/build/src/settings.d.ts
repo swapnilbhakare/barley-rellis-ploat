@@ -7,6 +7,7 @@ declare class TrellisChartSettings extends FormattingSettingsCard {
     showFYAxis: formattingSettings.ToggleSwitch;
     showXAxis: formattingSettings.ToggleSwitch;
     showYear: formattingSettings.ToggleSwitch;
+    showProbability: formattingSettings.ToggleSwitch;
     name: string;
     displayName: string;
     slices: Array<FormattingSettingsSlice>;

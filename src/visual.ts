@@ -36,24 +36,10 @@ export class Visual implements IVisual {
         this.target = options.element;
         this.handleContextMenu();
 
-    }
-    private getAccessToken(): Promise<string> {
-        if (this.host.getAccessToken) {
-            return this.host.getAccessToken();
-        } else {
-            // Mock access token for development
-            return Promise.resolve("mock_access_token");
-        }
+
     }
 
-    private getReportId(): Promise<string> {
-        if (this.host.getReportId) {
-            return this.host.getReportId();
-        } else {
-            // Mock report ID for development
-            return Promise.resolve("mock_report_id");
-        }
-    }
+
 
 
     private handleContextMenu() {
@@ -68,9 +54,9 @@ export class Visual implements IVisual {
         });
     }
 
+
+
     public async update(options: VisualUpdateOptions) {
-        const accessToken = await this.getAccessToken();
-        const reportId = await this.getReportId();
         this.formattingSettings = this.formattingSettingsService.populateFormattingSettingsModel(VisualFormattingSettingsModel, options.dataViews);
         const dataView: DataView = options.dataViews[0];
 
@@ -80,8 +66,7 @@ export class Visual implements IVisual {
             host: this.host,
             dataView: dataView,
             formattingSettings: this.formattingSettings,
-            accessToken: accessToken,
-            reportId: reportId,
+
         });
 
         ReactDOM.render(this.reactRoot, this.target);
